@@ -6,9 +6,10 @@
     "formidable": "^3.5.4",
     "next": "^15.4.6",
     "node-fetch": "^3.3.2",
-    "openai": "^5.12.0",
+    "openai": "^5.12.2",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "sharp": "^0.34.3",
     "typescript": "^5.9.2"
   },
   "devDependencies": {
@@ -25,11 +26,11 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev":   "next dev",
+    "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint":  "next lint",
-    "css":   "tailwindcss -i ./styles/globals.css -o ./styles/globals.css --watch"
+    "lint": "next lint",
+    "css": "tailwindcss -i ./styles/globals.css -o ./styles/globals.css --watch"
   },
   "keywords": [],
   "author": "",

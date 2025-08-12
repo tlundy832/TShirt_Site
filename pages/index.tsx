@@ -3,17 +3,19 @@ import { useState, useMemo } from 'react';
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
+  const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
   const [productId, setProductId] = useState<string | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [localPreview, setLocalPreview] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [style, setStyle] = useState<string>('Pop Art');
+  const [style, setStyle] = useState<string>('De-age');
   const [dragOver, setDragOver] = useState(false);
 
   const accept = 'image/png,image/jpeg,image/webp';
 
   const subtitle = useMemo(() => (
-    'Upload a photo, pick a style, and we\'ll generate a print‑ready T‑shirt mockup you can order in one click.'
+    "Upload a photo, pick a style, generate artwork with AI, then publish to Printify when you're ready."
   ), []);
 
   const onFile = (f: File) => {
@@ -24,7 +26,8 @@ export default function Home() {
     }
     setError(null);
     setFile(f);
-    setPreview(URL.createObjectURL(f));
+    setLocalPreview(URL.createObjectURL(f));
+    setGeneratedUrl(null);
     setProductId(null);
   };
 
@@ -41,9 +44,9 @@ export default function Home() {
     if (f) onFile(f);
   };
 
-  const handleSubmit = async () => {
+  const handleGenerate = async () => {
     if (!file) return;
-    setLoading(true);
+    setGenerating(true);
     setError(null);
 
     try {
@@ -52,6 +55,34 @@ export default function Home() {
       form.append('style', style);
 
       const res = await fetch('/api/create-shirt', { method: 'POST', body: form });
+      if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(msg || 'Failed to generate image');
+      }
+      const json = await res.json();
+      if (json.imageUrl) {
+        setGeneratedUrl(json.imageUrl);
+      } else {
+        throw new Error('No imageUrl returned');
+      }
+    } catch (e: any) {
+      setError(e.message || 'Something went wrong. Please try again.');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handlePublish = async () => {
+    if (!generatedUrl) return;
+    setPublishing(true);
+    setError(null);
+
+    try {
+      const res = await fetch('/api/create-printify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageUrl: generatedUrl }),
+      });
       if (!res.ok) {
         const msg = await res.text();
         throw new Error(msg || 'Failed to create product');
@@ -63,151 +94,141 @@ export default function Home() {
         throw new Error('No productId returned');
       }
     } catch (e: any) {
-      setError(e.message || 'Something went wrong. Please try again.');
+      setError(e.message || 'Something went wrong while publishing.');
     } finally {
-      setLoading(false);
+      setPublishing(false);
     }
   };
+
+  const displayUrl = generatedUrl || localPreview;
 
   return (
     <>
       <Head>
         <title>AI Tee Studio — Turn any photo into a custom T‑shirt</title>
-        <meta name="description" content="AI Tee Studio: Upload, stylize, and order a custom T‑shirt in minutes." />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+        <meta name="description" content="AI Tee Studio: Upload, stylize, generate, then publish to Printify." />
       </Head>
 
-      {/* Decorative gradient background */}
-      <div className="relative min-h-screen bg-slate-900 text-slate-100">
-        <div className="pointer-events-none absolute -top-24 -left-24 h-96 w-96 rounded-full bg-indigo-500/30 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-24 -right-24 h-[28rem] w-[28rem] rounded-full bg-fuchsia-500/20 blur-3xl" />
-        <div className="pointer-events-none absolute top-1/3 -right-16 h-72 w-72 rounded-full bg-cyan-400/20 blur-3xl" />
-
-        {/* Header */}
-        <header className="sticky top-0 z-10 border-b border-white/10 backdrop-blur bg-slate-900/60">
+      <div className="min-h-screen bg-gray-50 text-gray-900">
+        <header className="border-b bg-white/80 backdrop-blur">
           <div className="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-2xl bg-gradient-to-tr from-indigo-500 via-fuchsia-500 to-cyan-400 grid place-items-center text-white font-black shadow-md shadow-indigo-900/30">AI</div>
+              <div className="h-9 w-9 rounded-2xl bg-gradient-to-tr from-indigo-500 via-fuchsia-500 to-cyan-400 grid place-items-center text-white font-black">AI</div>
               <span className="font-semibold tracking-tight">AI Tee Studio</span>
             </div>
-            <nav className="hidden sm:flex gap-6 text-sm text-slate-300">
-              <span className="opacity-75">Upload</span>
-              <span className="opacity-75">Styles</span>
-              <span className="opacity-75">Checkout</span>
-            </nav>
           </div>
         </header>
 
-        {/* Hero */}
-        <section className="mx-auto max-w-6xl px-4 pt-14 pb-6 text-center">
-          <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-indigo-200 via-fuchsia-200 to-cyan-200">Make a stunning tee from any photo</h1>
-          <p className="mt-4 text-slate-300 max-w-2xl mx-auto">{subtitle}</p>
-        </section>
+        <section className="mx-auto max-w-6xl px-4 py-8 grid md:grid-cols-2 gap-8">
+          {/* Left: controls */}
+          <div>
+            <h1 className="text-3xl font-bold">Make an AI T-Shirt</h1>
+            <p className="mt-2 text-gray-600">{subtitle}</p>
 
-        {/* Main card */}
-        <section className="mx-auto max-w-6xl px-4 pb-20">
-          <div className="relative rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl shadow-2xl shadow-indigo-900/20 overflow-hidden">
-            <div className="grid md:grid-cols-2">
-              {/* Left column: uploader & controls */}
-              <div className="p-6 md:p-10">
-                <h2 className="text-lg font-semibold">1. Upload your photo</h2>
-                <label
-                  onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-                  onDragLeave={() => setDragOver(false)}
-                  onDrop={handleDrop}
-                  htmlFor="file"
-                  className={`relative mt-3 flex h-48 cursor-pointer items-center justify-center rounded-2xl border-2 border-dashed transition ${dragOver ? 'border-cyan-400/80 bg-cyan-400/10' : 'border-white/20 hover:border-white/30'}`}
-                >
-                  <div className="text-center px-6">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="mx-auto h-9 w-9 text-slate-300"><path d="M12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z"/><path fillRule="evenodd" d="M1.5 6A2.5 2.5 0 0 1 4 3.5h16A2.5 2.5 0 0 1 22.5 6v12A2.5 2.5 0 0 1 20 20.5H4A2.5 2.5 0 0 1 1.5 18V6Zm3 0a.5.5 0 0 0-.5.5v7.879l2.44-2.44a1.5 1.5 0 0 1 2.12 0l1.061 1.06 4.94-4.94a1.5 1.5 0 0 1 2.122 0L20.5 11.94V6.5a.5.5 0 0 0-.5-.5H4.5Z" clipRule="evenodd"/></svg>
-                    <p className="mt-3 text-sm text-slate-200"><span className="font-medium text-white">Click to upload</span> or drag & drop</p>
-                    <p className="text-xs text-slate-400">PNG, JPG, or WEBP up to 10MB</p>
-                  </div>
-                  <input id="file" type="file" accept={accept} onChange={handleInput} className="sr-only" />
-                </label>
-
-                <div className="mt-7">
-                  <h3 className="text-sm font-medium text-slate-200 mb-3">2. Pick a style</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {['Pop Art', 'Cartoon', 'Watercolor', 'Cyberpunk', 'Line Art', 'Vintage'].map((s) => (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => setStyle(s)}
-                        className={`rounded-full border px-3 py-1.5 text-sm transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 ${style === s ? 'border-cyan-400 text-white bg-cyan-400/10 ring-cyan-400' : 'border-white/20 text-slate-200 hover:border-white/40'}`}
-                      >
-                        {s}
-                      </button>
-                    ))}
-                  </div>
+            <div className="mt-6">
+              <h2 className="text-sm font-medium text-gray-900 mb-2">1. Upload your photo</h2>
+              <label
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={handleDrop}
+                htmlFor="file"
+                className={`relative mt-2 flex h-44 cursor-pointer items-center justify-center rounded-xl border-2 border-dashed bg-white transition ${dragOver ? 'border-cyan-500 bg-cyan-50' : 'border-gray-300 hover:border-gray-400'}`}
+              >
+                <div className="text-center">
+                  <p className="text-sm"><span className="font-medium text-indigo-700">Click to upload</span> or drag & drop</p>
+                  <p className="text-xs text-gray-500">PNG, JPG, or WEBP up to 10MB</p>
                 </div>
+                <input id="file" type="file" accept={accept} onChange={handleInput} className="sr-only" />
+              </label>
+            </div>
 
-                {error && (
-                  <div className="mt-5 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
-                    {error}
-                  </div>
-                )}
-
-                <div className="mt-8 flex items-center gap-3">
-                  <button
-                    onClick={handleSubmit}
-                    disabled={!file || loading}
-                    className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-cyan-400 px-5 py-2.5 text-white font-medium shadow-lg shadow-indigo-900/30 transition hover:brightness-110 disabled:opacity-50"
-                  >
-                    {loading && (
-                      <svg className="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="white" strokeWidth="4" fill="none" opacity="0.3"/><path d="M22 12a10 10 0 0 1-10 10" stroke="white" strokeWidth="4" fill="none"/></svg>
-                    )}
-                    {loading ? 'Generating…' : 'Generate & Create Product'}
-                  </button>
-                  <p className="text-xs text-slate-400">We\'ll generate your art and create a Printify product.</p>
-                </div>
-              </div>
-
-              {/* Right column: tee mockup */}
-              <div className="p-6 md:p-10 border-t border-white/10 md:border-l md:border-t-0 bg-slate-950/40">
-                <h2 className="text-lg font-semibold mb-4">Preview</h2>
-                <div className="relative mx-auto w-full max-w-sm">
-                  {/* T‑shirt silhouette */}
-                  <div className="relative mx-auto w-[320px] h-[360px]">
-                    <svg viewBox="0 0 300 340" className="absolute inset-0 h-full w-full text-slate-800">
-                      <path d="M75 30l35 20h80l35-20 45 35-30 40-25-15v210a20 20 0 0 1-20 20H105a20 20 0 0 1-20-20V90L60 105 30 65 75 30z" fill="currentColor" />
-                    </svg>
-                    {/* Print area frame */}
-                    <div className="absolute left-1/2 top-1/2 h-[200px] w-[160px] -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white/5 ring-1 ring-white/15 shadow-inner overflow-hidden">
-                      {preview ? (
-                        <img src={preview} alt="preview" className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="grid h-full place-items-center text-xs text-slate-400">Your image will appear here</div>
+            <div className="mt-6">
+              <h3 className="text-sm font-medium text-gray-900 mb-2">2. Pick a style</h3>
+              <div className="flex flex-wrap gap-2">
+                {['De-age', 'Cartoonify', 'Halloween'].map((s) => {
+                  const selected = style === s;
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => setStyle(s)}
+                      className={`relative rounded-full px-4 py-2 text-sm font-medium transition
+                        ${selected
+                          ? 'bg-indigo-600 text-white shadow ring-2 ring-indigo-600 ring-offset-2 ring-offset-white'
+                          : 'bg-white text-gray-700 border border-gray-300 hover:border-gray-400'}`}
+                    >
+                      {s}
+                      {selected && (
+                        <span className="absolute -right-1 -top-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-white text-indigo-600 ring-2 ring-indigo-600">
+                          <svg viewBox="0 0 20 20" fill="currentColor" className="h-3 w-3"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-7.25 7.25a1 1 0 01-1.414 0l-3-3a1 1 0 111.414-1.414L8.5 11.586l6.543-6.543a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                        </span>
                       )}
-                    </div>
-                  </div>
-                </div>
-
-                {productId && (
-                  <a
-                    href={`https://printify.com/products/${productId}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-6 block rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-center text-slate-100 hover:bg-white/20"
-                  >
-                    View & Order your Shirt ↗
-                  </a>
-                )}
-
-                <ul className="mt-8 grid grid-cols-1 gap-3 text-sm text-slate-300 md:grid-cols-3">
-                  <li className="rounded-xl border border-white/10 bg-white/5 p-3">1. Upload photo</li>
-                  <li className="rounded-xl border border-white/10 bg-white/5 p-3">2. Choose style</li>
-                  <li className="rounded-xl border border-white/10 bg-white/5 p-3">3. Generate & order</li>
-                </ul>
+                    </button>
+                  );
+                })}
               </div>
+            </div>
+
+            {error && (
+              <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
+            )}
+
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <button
+                onClick={handleGenerate}
+                disabled={!file || generating}
+                className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-4 py-2 text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {generating ? 'Generating…' : 'Generate Artwork'}
+              </button>
+
+              <button
+                onClick={handlePublish}
+                disabled={!generatedUrl || publishing}
+                className="inline-flex items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2 text-gray-900 shadow-sm transition hover:bg-gray-50 disabled:opacity-50"
+              >
+                {publishing ? 'Publishing…' : 'Create Printify Product'}
+              </button>
+            </div>
+          </div>
+
+          {/* Right: preview */}
+          <div className="bg-white rounded-2xl border p-6">
+            <h2 className="text-lg font-semibold mb-2">Preview</h2>
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-xs text-gray-500">Selected style</span>
+              <span className="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-xs text-indigo-700">{style}</span>
+            </div>
+            <div className="relative mx-auto w-full max-w-sm">
+              <div className="relative mx-auto w-[320px] h-[360px]">
+                <div className="absolute inset-0 rounded-xl bg-gray-100" />
+                <div className="absolute left-1/2 top-1/2 h-[200px] w-[160px] -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white ring-1 ring-gray-200 shadow-inner overflow-hidden">
+                  { (generatedUrl || localPreview) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={generatedUrl || localPreview!} alt="preview" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="grid h-full place-items-center text-xs text-gray-400">Your image will appear here</div>
+                  )}
+                </div>
+              </div>
+
+              {productId && (
+                <a
+                  href={`https://printify.com/products/${productId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-6 block rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-center text-indigo-700 hover:bg-indigo-100"
+                >
+                  View & Order your Shirt ↗
+                </a>
+              )}
             </div>
           </div>
         </section>
 
-        {/* Footer */}
-        <footer className="pb-10 text-center text-xs text-slate-400">
+        <footer className="pb-10 text-center text-xs text-gray-500">
           <p>© {new Date().getFullYear()} AI Tee Studio. Built with Next.js, Tailwind, and Printify.</p>
         </footer>
       </div>
