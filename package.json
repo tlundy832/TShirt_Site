@@ -1,0 +1,38 @@
+{
+  "dependencies": {
+    "@tailwindcss/cli": "^4.1.11",
+    "@types/node": "^24.2.0",
+    "@types/react": "^19.1.9",
+    "formidable": "^3.5.4",
+    "next": "^15.4.6",
+    "node-fetch": "^3.3.2",
+    "openai": "^5.12.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "typescript": "^5.9.2"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.11"
+  },
+  "name": "t-shirt_site",
+  "version": "1.0.0",
+  "description": "",
+  "main": "next.config.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev":   "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint":  "next lint",
+    "css":   "tailwindcss -i ./styles/globals.css -o ./styles/globals.css --watch"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}
