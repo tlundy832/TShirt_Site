@@ -1,11 +1,14 @@
 {
   "dependencies": {
+    "@next-auth/prisma-adapter": "^1.0.7",
     "@tailwindcss/cli": "^4.1.11",
+    "@tailwindcss/postcss": "^4.1.12",
     "@types/node": "^24.2.0",
     "@types/react": "^19.1.9",
     "form-data": "^4.0.4",
     "formidable": "^3.5.4",
     "next": "^15.4.6",
+    "next-auth": "^4.24.11",
     "node-fetch": "^3.3.2",
     "openai": "^5.12.2",
     "react": "^19.1.1",

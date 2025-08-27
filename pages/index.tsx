@@ -1,237 +1,161 @@
-import Head from 'next/head';
-import { useState, useMemo } from 'react';
+import Head from 'next/head'
+import Navbar from '../components/Navbar'
+import Link from 'next/link'
+import { useEffect, useRef, useState } from 'react'
 
-export default function Home() {
-  const [file, setFile] = useState<File | null>(null);
-  const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
-  const [productId, setProductId] = useState<string | null>(null);
-  const [localPreview, setLocalPreview] = useState<string | null>(null);
-  const [generating, setGenerating] = useState(false);
-  const [publishing, setPublishing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [style, setStyle] = useState<string>('De-age');
-  const [dragOver, setDragOver] = useState(false);
+export default function HomePage() {
+  // Intersection Observer for step animations
+  const stepsRef = useRef<HTMLDivElement | null>(null)
+  const [visible, setVisible] = useState(false)
+  useEffect(() => {
+    if (!stepsRef.current) return
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting) { setVisible(true); observer.disconnect() } })
+    }, { threshold: 0.25 })
+    observer.observe(stepsRef.current)
+    return () => observer.disconnect()
+  }, [])
 
-  const accept = 'image/png,image/jpeg,image/webp';
-
-  const subtitle = useMemo(() => (
-    "Upload a photo, pick a style, generate artwork with AI, then publish to Printify when you're ready."
-  ), []);
-
-  const onFile = (f: File) => {
-    if (!f) return;
-    if (!accept.includes(f.type)) {
-      setError('Please upload a PNG, JPG, or WEBP image.');
-      return;
+  const steps = [
+    {
+      id: 1,
+      title: 'Upload Your Photo',
+      badgeFrom: 'from-indigo-500 to-purple-600',
+      dot: 'bg-indigo-500',
+      meta: 'Source Image',
+      text: 'Pick any photo – a portrait, pet, landscape, or memory. High quality helps, but we can work with almost anything.',
+      icon: (
+        <svg className="w-6 h-6 text-indigo-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4 8c0-1.886 0-2.828.586-3.414C5.172 4 6.114 4 8 4h1.172a2 2 0 0 0 1.414-.586l.828-.828A2 2 0 0 1 12.828 2h2.344a2 2 0 0 1 1.414.586l.828.828A2 2 0 0 0 18.828 4H20c1.886 0 2.828 0 3.414.586C24 5.172 24 6.114 24 8v8c0 1.886 0 2.828-.586 3.414C22.828 20 21.886 20 20 20H8c-1.886 0-2.828 0-3.414-.586C4 18.828 4 17.886 4 16V8Z" />
+          <path d="M4 14.5 8.5 11a2 2 0 0 1 2.5.12l1.273 1.09a2 2 0 0 0 2.535.056L18 10" />
+          <circle cx="16.5" cy="7.5" r="1.5" />
+        </svg>
+      )
+    },
+    {
+      id: 2,
+      title: 'AI Magic Happens',
+      badgeFrom: 'from-purple-500 to-pink-600',
+      dot: 'bg-purple-500',
+      meta: 'Style Variations',
+      text: 'Our models reinterpret it into multiple curated styles (clean vector, comic ink, neon synth, painterly & more). You preview instantly.',
+      icon: (
+        <svg className="w-6 h-6 text-purple-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 2v4M5.5 5.5l2.8 2.8M2 12h4M18.5 5.5l-2.8 2.8M22 12h-4M12 18v4M7.5 16.5l-2.8 2.8M16.5 16.5l2.8 2.8" />
+          <circle cx="12" cy="12" r="3.5" />
+        </svg>
+      )
+    },
+    {
+      id: 3,
+      title: 'Get Your T-Shirt',
+      badgeFrom: 'from-pink-500 to-rose-600',
+      dot: 'bg-rose-500',
+      meta: 'Printed & Shipped',
+      text: 'Pick a favorite design, choose shirt size & color, then we print on premium fabric and ship fast. No minimums.',
+      icon: (
+        <svg className="w-6 h-6 text-rose-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M16 3h-1a4 4 0 0 1-6 0H8a5 5 0 0 0-5 5v6a7 7 0 0 0 7 7h4a7 7 0 0 0 7-7V8a5 5 0 0 0-5-5Z" />
+          <path d="M10 13.5 12 15l4-4" />
+        </svg>
+      )
     }
-    setError(null);
-    setFile(f);
-    setLocalPreview(URL.createObjectURL(f));
-    setGeneratedUrl(null);
-    setProductId(null);
-  };
-
-  const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (f) onFile(f);
-  };
-
-  const handleDrop = (e: React.DragEvent<HTMLLabelElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragOver(false);
-    const f = e.dataTransfer.files?.[0];
-    if (f) onFile(f);
-  };
-
-  const handleGenerate = async () => {
-    if (!file) return;
-    setGenerating(true);
-    setError(null);
-
-    try {
-      const form = new FormData();
-      form.append('file', file);
-      form.append('style', style);
-
-      const res = await fetch('/api/create-shirt', { method: 'POST', body: form });
-      if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(msg || 'Failed to generate image');
-      }
-      const json = await res.json();
-      if (json.imageUrl) {
-        setGeneratedUrl(json.imageUrl);
-      } else {
-        throw new Error('No imageUrl returned');
-      }
-    } catch (e: any) {
-      setError(e.message || 'Something went wrong. Please try again.');
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  const handlePublish = async () => {
-    if (!generatedUrl) return;
-    setPublishing(true);
-    setError(null);
-
-    try {
-      const res = await fetch('/api/create-printify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl: generatedUrl }),
-      });
-      if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(msg || 'Failed to create product');
-      }
-      const json = await res.json();
-      if (json.productId) {
-        setProductId(json.productId);
-      } else {
-        throw new Error('No productId returned');
-      }
-    } catch (e: any) {
-      setError(e.message || 'Something went wrong while publishing.');
-    } finally {
-      setPublishing(false);
-    }
-  };
-
-  const displayUrl = generatedUrl || localPreview;
+  ]
 
   return (
     <>
       <Head>
-        <title>AI Tee Studio — Turn any photo into a custom T‑shirt</title>
-        <meta name="description" content="AI Tee Studio: Upload, stylize, generate, then publish to Printify." />
+        <title>Tee Genie - Turn Photos into T-Shirt Art</title>
+        <meta name="description" content="Create stunning AI-generated artwork from your photos and get it printed on a custom t-shirt." />
       </Head>
 
-      <div className="min-h-screen bg-gray-50 text-gray-900">
-        <header className="border-b bg-white/80 backdrop-blur">
-          <div className="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-2xl bg-gradient-to-tr from-indigo-500 via-fuchsia-500 to-cyan-400 grid place-items-center text-white font-black">AI</div>
-              <span className="font-semibold tracking-tight">AI Tee Studio</span>
-            </div>
+      <div className="min-h-screen">
+        <Navbar />
+        
+        {/* Hero Image Section */}
+        <div className="h-screen relative overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img 
+            src="/TShirt_hero.png" 
+            alt="AI T-Shirt Design Hero" 
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-black/20"></div>
+        </div>
+
+        {/* Content Section Below Hero */}
+        <div className="bg-white py-16 px-6 lg:px-12">
+          <div className="max-w-4xl mx-auto text-center">
+            <h1 className="text-5xl lg:text-6xl font-bold text-gray-900 mb-6 leading-tight">
+              Transform Your Photos Into 
+              <span className="block text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">
+                Wearable Art
+              </span>
+            </h1>
+            
+            <p className="text-xl lg:text-2xl text-gray-600 mb-12 leading-relaxed max-w-3xl mx-auto">
+              Tee Genie uses cutting-edge AI technology to transform your ordinary photos into stunning artistic designs, 
+              then prints them on high-quality t-shirts delivered right to your door.
+            </p>
+
+            <Link href="/dashboard" className="inline-block bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold text-lg px-10 py-4 rounded-full shadow-xl hover:scale-105 transition-transform">
+              Start Creating Now
+            </Link>
           </div>
-        </header>
+        </div>
 
-        <section className="mx-auto max-w-6xl px-4 py-8 grid md:grid-cols-2 gap-8">
-          {/* Left: controls */}
-          <div>
-            <h1 className="text-3xl font-bold">Make an AI T-Shirt</h1>
-            <p className="mt-2 text-gray-600">{subtitle}</p>
+        {/* About Section (Refined with icons + animation) */}
+        <div id="about" className="relative py-28 px-6 lg:px-12 bg-gradient-to-b from-gray-50 via-white to-gray-50 border-t border-gray-100">
+          <div className="max-w-6xl mx-auto">
+            <h2 className="text-4xl font-bold text-center text-gray-900 mb-4">How Tee Genie Works</h2>
+            <p className="max-w-2xl mx-auto text-center text-gray-500 mb-16 text-lg">A frictionless, intentionally simple 3–step flow from your photo to a printed shirt.</p>
 
-            <div className="mt-6">
-              <h2 className="text-sm font-medium text-gray-900 mb-2">1. Upload your photo</h2>
-              <label
-                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={handleDrop}
-                htmlFor="file"
-                className={`relative mt-2 flex h-44 cursor-pointer items-center justify-center rounded-xl border-2 border-dashed bg-white transition ${dragOver ? 'border-cyan-500 bg-cyan-50' : 'border-gray-300 hover:border-gray-400'}`}
-              >
-                <div className="text-center">
-                  <p className="text-sm"><span className="font-medium text-indigo-700">Click to upload</span> or drag & drop</p>
-                  <p className="text-xs text-gray-500">PNG, JPG, or WEBP up to 10MB</p>
-                </div>
-                <input id="file" type="file" accept={accept} onChange={handleInput} className="sr-only" />
-              </label>
-            </div>
-
-            <div className="mt-6">
-              <h3 className="text-sm font-medium text-gray-900 mb-2">2. Pick a style</h3>
-              <div className="flex flex-wrap gap-2">
-                {['De-age', 'Cartoonify', 'Halloween'].map((s) => {
-                  const selected = style === s;
-                  return (
-                    <button
-                      key={s}
-                      type="button"
-                      role="radio"
-                      aria-checked={selected}
-                      onClick={() => setStyle(s)}
-                      className={`relative rounded-full px-4 py-2 text-sm font-medium transition
-                        ${selected
-                          ? 'bg-indigo-600 text-white shadow ring-2 ring-indigo-600 ring-offset-2 ring-offset-white'
-                          : 'bg-white text-gray-700 border border-gray-300 hover:border-gray-400'}`}
-                    >
-                      {s}
-                      {selected && (
-                        <span className="absolute -right-1 -top-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-white text-indigo-600 ring-2 ring-indigo-600">
-                          <svg viewBox="0 0 20 20" fill="currentColor" className="h-3 w-3"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-7.25 7.25a1 1 0 01-1.414 0l-3-3a1 1 0 111.414-1.414L8.5 11.586l6.543-6.543a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {error && (
-              <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
-            )}
-
-            <div className="mt-6 flex flex-wrap items-center gap-3">
-              <button
-                onClick={handleGenerate}
-                disabled={!file || generating}
-                className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-4 py-2 text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-50"
-              >
-                {generating ? 'Generating…' : 'Generate Artwork'}
-              </button>
-
-              <button
-                onClick={handlePublish}
-                disabled={!generatedUrl || publishing}
-                className="inline-flex items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2 text-gray-900 shadow-sm transition hover:bg-gray-50 disabled:opacity-50"
-              >
-                {publishing ? 'Publishing…' : 'Create Printify Product'}
-              </button>
-            </div>
-          </div>
-
-          {/* Right: preview */}
-          <div className="bg-white rounded-2xl border p-6">
-            <h2 className="text-lg font-semibold mb-2">Preview</h2>
-            <div className="mb-3 flex items-center justify-between">
-              <span className="text-xs text-gray-500">Selected style</span>
-              <span className="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-xs text-indigo-700">{style}</span>
-            </div>
-            <div className="relative mx-auto w-full max-w-sm">
-              <div className="relative mx-auto w-[320px] h-[360px]">
-                <div className="absolute inset-0 rounded-xl bg-gray-100" />
-                <div className="absolute left-1/2 top-1/2 h-[200px] w-[160px] -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white ring-1 ring-gray-200 shadow-inner overflow-hidden">
-                  { (generatedUrl || localPreview) ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={generatedUrl || localPreview!} alt="preview" className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="grid h-full place-items-center text-xs text-gray-400">Your image will appear here</div>
-                  )}
-                </div>
-              </div>
-
-              {productId && (
-                <a
-                  href={`https://printify.com/products/${productId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-6 block rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-center text-indigo-700 hover:bg-indigo-100"
+            <div ref={stepsRef} className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-10">
+              {steps.map((s, i) => (
+                <div
+                  key={s.id}
+                  className={[
+                    'group relative rounded-2xl bg-white/70 backdrop-blur-sm ring-1 ring-gray-200 hover:ring-indigo-200 transition-all shadow-sm hover:shadow-md p-6 flex flex-col overflow-hidden',
+                    visible ? 'animate-in-card' : 'pre-animate-card'
+                  ].join(' ')}
+                  style={{transitionDelay: visible ? `${i * 90}ms` : '0ms'}}
                 >
-                  View & Order your Shirt ↗
-                </a>
-              )}
+                  {/* accent gradient aura */}
+                  <div className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity" style={{background:'radial-gradient(circle at 30% 20%, rgba(99,102,241,0.12), transparent 60%)'}} />
+                  <div className="flex items-center gap-3 mb-3 relative z-10">
+                    <span className={`inline-flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br ${s.badgeFrom} text-white text-sm font-semibold shadow-sm group-hover:scale-105 transition-transform`}>{s.id}</span>
+                    <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                      <span className="icon-wrapper" aria-hidden>{s.icon}</span>
+                      {s.title}
+                    </h3>
+                  </div>
+                  <p className="text-sm leading-relaxed text-gray-600 flex-1 relative z-10">{s.text}</p>
+                  <div className="mt-5 h-px bg-gradient-to-r from-transparent via-gray-100 to-transparent relative z-10" />
+                  <div className="mt-4 flex items-center gap-2 text-[11px] uppercase tracking-wide text-gray-400 font-medium relative z-10">
+                    <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} /> {s.meta}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="text-center mt-20">
+              <p className="text-lg text-gray-600 mb-8">Ready to create something amazing?</p>
+              <Link href="/dashboard" className="inline-block bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold text-lg px-10 py-4 rounded-full shadow-xl hover:scale-105 transition-transform">
+                Try Tee Genie Free
+              </Link>
             </div>
           </div>
-        </section>
-
-        <footer className="pb-10 text-center text-xs text-gray-500">
-          <p>© {new Date().getFullYear()} AI Tee Studio. Built with Next.js, Tailwind, and Printify.</p>
-        </footer>
+        </div>
       </div>
+      <style jsx>{`
+        .pre-animate-card { opacity:0; transform:translateY(28px) scale(.97); }
+        .animate-in-card { opacity:1; transform:translateY(0) scale(1); transition:opacity .6s cubic-bezier(.4,0,.2,1), transform .6s cubic-bezier(.4,0,.2,1); }
+        .icon-wrapper { position:relative; display:inline-flex; }
+        .icon-wrapper:before { content:''; position:absolute; inset:-6px; border-radius:14px; background:radial-gradient(circle at 30% 30%, rgba(0,0,0,0.06), transparent 70%); opacity:0; transition:opacity .4s; }
+        .group:hover .icon-wrapper:before { opacity:1; }
+        .group:hover svg { transform:translateY(-2px) scale(1.05); }
+        svg { transition:transform .5s cubic-bezier(.34,1.56,.64,1); }
+      `}</style>
     </>
-  );
+  )
 }
